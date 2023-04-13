@@ -1,6 +1,7 @@
 /*
  * Copyright 2008, Freescale Semiconductor, Inc
  * Andy Fleming
+ * Updates copyright 2023 Nick McKinney
  *
  * Based vaguely on the Linux code
  *
@@ -23,10 +24,15 @@
  * MA 02111-1307 USA
  */
 
+#include <stdint.h>
 #include "mmc.h"
-#include <stdio.h>
-#include <string.h>
+#include <endian.h>
 
+#define NULL ((void *) 0)
+
+#define SDCARD_PRINT_DEBUG
+
+// TODO: calibrate this delay so that it actually waits the right number of microseconds (I think it waits too long as-is)
 void udelay(int t) {
 #define US_DELAY 100
 	volatile int us = US_DELAY;
@@ -67,19 +73,20 @@ static const int multipliers[] = {
 	80,
 };
 
+
 static void mmc_set_ios(struct mmc *mmc)
 {
 	mmc->set_ios(mmc);
 }
 
-static void mmc_set_bus_width(struct mmc *mmc, uint width)
+static void mmc_set_bus_width(struct mmc *mmc, uint32_t width)
 {
 	mmc->bus_width = width;
 
 	mmc_set_ios(mmc);
 }
 
-static void mmc_set_clock(struct mmc *mmc, uint clock)
+static void mmc_set_clock(struct mmc *mmc, uint32_t clock)
 {
 	if (clock > mmc->f_max)
 		clock = mmc->f_max;
@@ -267,8 +274,8 @@ static int mmc_send_status(struct mmc *mmc, int timeout)
 			     MMC_STATE_PRG)
 				break;
 			else if (cmd.response[0] & MMC_STATUS_MASK) {
-				printf("Status Error: 0x%08X\n\r",
-					cmd.response[0]);
+				//printf("Status Error: 0x%08X\n\r",
+				//	cmd.response[0]);
 				return COMM_ERR;
 			}
 		} else if (--retries < 0)
@@ -279,7 +286,7 @@ static int mmc_send_status(struct mmc *mmc, int timeout)
 	} while (timeout--);
 
 	if (timeout <= 0) {
-		printf("Timeout waiting card ready\n\r");
+		//printf("Timeout waiting card ready\n\r");
 		return TIMEOUT;
 	}
 
@@ -353,10 +360,13 @@ static int sd_change_freq(struct mmc *mmc)
 {
 	int err;
 	struct mmc_cmd cmd;
-	uint scr[2];
-	uint switch_status[16];
+	uint32_t scr[2];
+	uint32_t switch_status[16];
 	struct mmc_data data;
 	int timeout;
+
+	scr[0] = 0x11223344;
+	scr[1] = 0x55667788;
 
 	mmc->card_caps = 0;
 
@@ -391,11 +401,9 @@ retry_scr:
 		return err;
 	}
 
-	mmc->scr[0] = scr[0];
-	mmc->scr[1] = scr[1];
-
-	printf("SCR: %08x\n\r", mmc->scr[0]);
-	printf("     %08x\n\r", mmc->scr[1]);
+	// SCR is in big-endian format from the card
+	mmc->scr[0] = be32toh(scr[0]);
+	mmc->scr[1] = be32toh(scr[1]);
 
 	switch ((mmc->scr[0] >> 24) & 0xf) {
 		case 0:
@@ -427,9 +435,9 @@ retry_scr:
 		if (err)
 			return err;
 
-		printf("switch status 7 %08x\n\r", switch_status[7]);
-		printf("switch status 3 %08x\n\r", switch_status[3]);
-		printf("switch status 4 %08x\n\r", switch_status[4]);
+		//printf("switch status 7 %08x\n\r", switch_status[7]);
+		//printf("switch status 3 %08x\n\r", switch_status[3]);
+		//printf("switch status 4 %08x\n\r", switch_status[4]);
 		/* The high-speed function is busy.  Try again */
 		if (!(switch_status[7] & SD_HIGHSPEED_BUSY))
 			break;
@@ -506,8 +514,8 @@ static int mmc_change_freq(struct mmc *mmc)
 static int mmc_startup(struct mmc *mmc)
 {
 	int err, width;
-	uint mult, freq;
-	uint cmult, csize, capacity;
+	uint32_t mult, freq;
+	uint32_t cmult, csize, capacity;
 	struct mmc_cmd cmd;
 	char ext_csd[512];
 	char test_csd[512];
@@ -764,7 +772,7 @@ static int mmc_set_blocklen(struct mmc *mmc, int len)
 	return mmc_send_cmd(mmc, &cmd, NULL);
 }
 
-static int mmc_read_blocks(struct mmc *mmc, void *dst, size_t start, size_t blkcnt)
+static int mmc_read_blocks(struct mmc *mmc, void *dst, uint32_t start, uint32_t blkcnt)
 {
 	struct mmc_cmd cmd;
 	struct mmc_data data;
@@ -794,7 +802,7 @@ static int mmc_read_blocks(struct mmc *mmc, void *dst, size_t start, size_t blkc
 		cmd.cmdarg = 0;
 		cmd.resp_type = MMC_RSP_R1b;
 		if (mmc_send_cmd(mmc, &cmd, NULL)) {
-			printf("mmc fail to send stop cmd\n");
+			//printf("mmc fail to send stop cmd\n");
 			return 0;
 		}
 	}
@@ -837,7 +845,7 @@ int mmc_init(struct mmc *mmc)
 		err = mmc_send_op_cond(mmc);
 
 		if (err) {
-			printf("Card did not respond to voltage select!\n\r");
+			//printf("Card did not respond to voltage select!\n\r");
 			return UNUSABLE_ERR;
 		}
 	}
@@ -850,16 +858,16 @@ int mmc_init(struct mmc *mmc)
 	return err;
 }
 
-size_t mmc_bread(struct mmc *mmc, size_t start, size_t blkcnt, void *dst)
+uint32_t mmc_bread(struct mmc *mmc, uint32_t start, uint32_t blkcnt, void *dst)
 {
-	size_t cur, blocks_todo = blkcnt;
+	uint32_t cur, blocks_todo = blkcnt;
 
 	if (blkcnt == 0)
 		return 0;
 
 	if ((start + blkcnt) > mmc->capacity / mmc->read_bl_len) {
-		printf("MMC: block number 0x%lx exceeds max(0x%lx)\n",
-			start + blkcnt, mmc->capacity / mmc->read_bl_len);
+		//printf("MMC: block number 0x%lx exceeds max(0x%lx)\n",
+		//	start + blkcnt, mmc->capacity / mmc->read_bl_len);
 		return 0;
 	}
 
@@ -878,7 +886,7 @@ size_t mmc_bread(struct mmc *mmc, size_t start, size_t blkcnt, void *dst)
 	return blkcnt;
 }
 
-void print_mmcinfo(struct mmc *mmc)
+/*void print_mmcinfo(struct mmc *mmc)
 {
 	printf("Device: %s\n\r", mmc->name);
 	printf("Manufacturer ID: %x\n\r", mmc->cid[0] >> 24);
@@ -897,7 +905,7 @@ void print_mmcinfo(struct mmc *mmc)
 	printf("Capacity: %ld\n\r", mmc->capacity);
 
 	printf("Bus Width: %d-bit\n\r", mmc->bus_width);
-}
+} */
 
 
 

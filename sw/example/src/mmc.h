@@ -1,6 +1,7 @@
 /*
  * Copyright 2008,2010 Freescale Semiconductor, Inc
  * Andy Fleming
+ * Updates copyright 2023 Nick McKinney
  *
  * Based (loosely) on the Linux code
  *
@@ -26,7 +27,9 @@
 #ifndef _MMC_H_
 #define _MMC_H_
 
-#include <sys/types.h>
+// #define SDCARD_PRINT_DEBUG
+
+#include <stdint.h>
 
 #define SD_VERSION_SD	0x20000
 #define SD_VERSION_2	(SD_VERSION_SD | 0x20)
@@ -206,14 +209,14 @@ struct mmc_cid {
 	unsigned char mid;
 	unsigned char prv;
 	unsigned char mdt;
-	char pnm[7];
+	uint8_t pnm[7];
 };
 
 struct mmc_cmd {
-	ushort cmdidx;
-	uint resp_type;
-	uint cmdarg;
-	uint response[4];
+	uint16_t cmdidx;
+	uint32_t resp_type;
+	uint32_t cmdarg;
+	uint32_t response[4];
 };
 
 struct mmc_data {
@@ -221,48 +224,48 @@ struct mmc_data {
 		char *dest;
 		const char *src; /* src buffers don't get written to */
 	};
-	uint flags;
-	uint blocks;
-	uint blocksize;
+	uint32_t flags;
+	uint32_t blocks;
+	uint32_t blocksize;
 };
 
 struct mmc {
 //	struct list_head link;
 	char name[32];
 	void *priv;
-	uint voltages;
-	uint version;
-	uint has_init;
-	uint f_min;
-	uint f_max;
+	uint32_t voltages;
+	uint32_t version;
+	uint32_t has_init;
+	uint32_t f_min;
+	uint32_t f_max;
 	int high_capacity;
-	uint bus_width;
-	uint clock;
-	uint card_caps;
-	uint host_caps;
-	uint ocr;
-	uint scr[2];
-	uint csd[4];
-	uint cid[4];
-	ushort rca;
-	char part_config;
-	char part_num;
-	uint tran_speed;
-	uint read_bl_len;
-	uint write_bl_len;
-	uint erase_grp_size;
-	size_t capacity;
+	uint32_t bus_width;
+	uint32_t clock;
+	uint32_t card_caps;
+	uint32_t host_caps;
+	uint32_t ocr;
+	uint32_t scr[2];
+	uint32_t csd[4];
+	uint32_t cid[4];
+	uint16_t rca;
+	uint8_t part_config;
+	uint8_t part_num;
+	uint32_t tran_speed;
+	uint32_t read_bl_len;
+	uint32_t write_bl_len;
+	uint32_t erase_grp_size;
+	uint32_t capacity;
 //	block_dev_desc_t block_dev;
 	int (*send_cmd)(struct mmc *mmc,
 			struct mmc_cmd *cmd, struct mmc_data *data);
 	void (*set_ios)(struct mmc *mmc);
 	int (*init)(struct mmc *mmc);
 	int (*getcd)(struct mmc *mmc);
-	uint b_max;
+	uint32_t b_max;
 };
 
 int mmc_init(struct mmc *mmc);
-size_t mmc_bread(struct mmc *mmc, size_t start, size_t blkcnt, void *dst);
+uint32_t mmc_bread(struct mmc *mmc, uint32_t start, uint32_t blkcnt, void *dst);
 void print_mmcinfo(struct mmc *mmc);
 
 #endif /* _MMC_H_ */
