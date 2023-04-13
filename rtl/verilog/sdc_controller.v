@@ -56,7 +56,9 @@
 //////////////////////////////////////////////////////////////////////
 `include "sd_defines.h"
 
-module sdc_controller(
+module sdc_controller #(
+	parameter [0:0] WB_LITTLE_ENDIAN = 0
+) (
            // WISHBONE common
            wb_clk_i, 
            wb_rst_i, 
@@ -147,6 +149,8 @@ wire d_write;
 wire d_read;
 wire [31:0] data_in_rx_fifo;
 wire [31:0] data_out_tx_fifo;
+wire [31:0] data_in_rx_fifo_le;
+wire [31:0] data_out_tx_fifo_le;
 wire start_tx_fifo;
 wire start_rx_fifo;
 wire tx_fifo_empty;
@@ -275,10 +279,13 @@ sd_data_master sd_data_master0(
     .int_status_rst_i (data_int_rst_sd_clk)
     );
 
+assign data_out_tx_fifo_le = {data_out_tx_fifo[7:0], data_out_tx_fifo[15:8], data_out_tx_fifo[23:16], data_out_tx_fifo[31:24]};
+assign data_in_rx_fifo_le = {data_in_rx_fifo[7:0], data_in_rx_fifo[15:8], data_in_rx_fifo[23:16], data_in_rx_fifo[31:24]};
+
 sd_data_serial_host sd_data_serial_host0(
     .sd_clk         (sd_clk_o),
     .rst            (wb_rst_i | software_reset_reg_sd_clk[0]),
-    .data_in        (data_out_tx_fifo),
+    .data_in        (WB_LITTLE_ENDIAN ? data_out_tx_fifo_le : data_out_tx_fifo),
     .rd             (rd_fifo),
     .data_out       (data_in_rx_fifo),
     .we             (we_fifo),
@@ -309,7 +316,7 @@ sd_fifo_filler sd_fifo_filler0(
     .en_tx_i   (start_tx_fifo),
     .adr_i     (dma_addr_reg_wb_clk),
     .sd_clk    (sd_clk_o),
-    .dat_i     (data_in_rx_fifo),
+    .dat_i     (WB_LITTLE_ENDIAN ? data_in_rx_fifo_le : data_in_rx_fifo),
     .dat_o     (data_out_tx_fifo),
     .wr_i      (we_fifo),
     .rd_i      (rd_fifo),
