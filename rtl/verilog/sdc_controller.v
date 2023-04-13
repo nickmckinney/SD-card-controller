@@ -211,7 +211,8 @@ sd_clock_divider clock_divider0(
     .SD_CLK  (sd_clk_o)
     );
 
-assign sd_clk_o_pad  = sd_clk_o ;
+// hacky fix for data sampling issue
+assign sd_clk_o_pad  = ~sd_clk_o ;
 
 sd_cmd_master sd_cmd_master0(
     .sd_clk       (sd_clk_o),

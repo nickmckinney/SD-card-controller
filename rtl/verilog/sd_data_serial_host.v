@@ -103,7 +103,7 @@ reg [2:0] crc_s ;
 reg [4:0] data_index;
 
 //sd data input pad register
-always @(posedge sd_clk)
+always @(negedge sd_clk)  // hacky fix for data sampling issue
     DAT_dat_reg <= DAT_dat_i;
 
 genvar i;

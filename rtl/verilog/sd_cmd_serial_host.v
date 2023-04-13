@@ -116,7 +116,7 @@ reg [STATE_SIZE-1:0] next_state;
 `define cmd_idx  (CMD_SIZE-1-counter) 
 
 //sd cmd input pad register
-always @(posedge sd_clk)
+always @(negedge sd_clk)  // hacky fix for data sampling issue
     cmd_dat_reg <= cmd_dat_i;
 
 //------------------------------------------
